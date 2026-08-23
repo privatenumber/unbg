@@ -1,0 +1,26 @@
+{
+	"name": "web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vue-tsc --noEmit && vite build",
+		"preview": "vite preview",
+		"type-check": "vue-tsc --noEmit"
+	},
+	"devDependencies": {
+		"@iconify-json/lucide": "^1.2.124",
+		"@iconify-json/simple-icons": "^1.2.93",
+		"@tailwindcss/vite": "^4.3.3",
+		"@types/node": "^25.5.0",
+		"@vitejs/plugin-vue": "^6.0.8",
+		"manten": "^2.0.2",
+		"tailwindcss": "^4.3.3",
+		"typescript": "^6.0.2",
+		"unplugin-icons": "^23.0.1",
+		"vite": "^8.2.2",
+		"vue": "^3.5.41",
+		"vue-tsc": "^3.3.10"
+	}
+}

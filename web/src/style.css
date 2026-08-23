@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme {
+	--color-ink: #09090b;
+	--color-surface: #121214;
+	--color-surface-2: #18181b;
+	--color-line: #26262b;
+	--color-accent: #7c5cff;
+	--color-accent-2: #22d3ee;
+
+	--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	--font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+:root {
+	--slider-track-height: 4px;
+	--slider-thumb-size: 16px;
+	--slider-thumb-border-width: 3px;
+	--slider-thumb-shadow: 0 0 0 1px rgb(0 0 0 / 0.4);
+}
+
+@layer base {
+	html {
+		color-scheme: dark;
+	}
+
+	body {
+		margin: 0;
+		min-height: 100dvh;
+		background-color: var(--color-ink);
+		color: var(--color-zinc-300);
+		font-family: var(--font-sans);
+		-webkit-font-smoothing: antialiased;
+		text-rendering: optimizeLegibility;
+		/* Soft ambient glow behind the content. */
+		background-image:
+			radial-gradient(60rem 40rem at 50% -10%, color-mix(in oklab, var(--color-accent) 16%, transparent), transparent 70%),
+			radial-gradient(50rem 30rem at 100% 0%, color-mix(in oklab, var(--color-accent-2) 8%, transparent), transparent 70%);
+		background-attachment: fixed;
+	}
+
+	::selection {
+		background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+		color: #fff;
+	}
+
+	* {
+		scrollbar-color: var(--color-line) transparent;
+	}
+}
+
+@keyframes fade-in {
+	from { opacity: 0; transform: translateY(4px); }
+	to { opacity: 1; transform: none; }
+}
+
+@utility fade-in {
+	animation: fade-in 0.3s ease both;
+}
+
+/* Alpha-transparency checkerboard, the signature backdrop for results. */
+@utility checkerboard {
+	background-color: #0d0d0f;
+	background-image:
+		linear-gradient(45deg, #1c1c20 25%, transparent 25%),
+		linear-gradient(-45deg, #1c1c20 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, #1c1c20 75%),
+		linear-gradient(-45deg, transparent 75%, #1c1c20 75%);
+	background-size: 22px 22px;
+	background-position: 0 0, 0 11px, 11px -11px, -11px 0;
+}
+
+/* Compact checker fill for small swatches (reads at ~20px). */
+@utility checker-swatch {
+	background: repeating-conic-gradient(#d4d4d4 0 25%, #525252 0 50%) 0 0 / 8px 8px;
+}
+
+/* Thin, modern range input styled to match the dark theme. */
+@layer components {
+	input[type="range"] {
+		appearance: none;
+		-webkit-appearance: none;
+		width: 100%;
+		height: var(--slider-track-height);
+		border-radius: 999px;
+		background: var(--color-line);
+		cursor: pointer;
+	}
+
+	input[type="range"]::-webkit-slider-thumb {
+		appearance: none;
+		-webkit-appearance: none;
+		width: var(--slider-thumb-size);
+		height: var(--slider-thumb-size);
+		border-radius: 999px;
+		background: #fff;
+		border: var(--slider-thumb-border-width) solid var(--color-accent);
+		box-shadow: var(--slider-thumb-shadow);
+		transition: transform 0.1s ease;
+	}
+
+	input[type="range"]::-webkit-slider-thumb:hover {
+		transform: scale(1.15);
+	}
+
+	input[type="range"]::-moz-range-thumb {
+		width: var(--slider-thumb-size);
+		height: var(--slider-thumb-size);
+		border-radius: 999px;
+		background: #fff;
+		border: var(--slider-thumb-border-width) solid var(--color-accent);
+		box-shadow: var(--slider-thumb-shadow);
+	}
+
+	input[type="range"]:focus-visible::-webkit-slider-thumb {
+		outline: 2px solid #fff;
+		outline-offset: 2px;
+	}
+
+	input[type="range"]:focus-visible::-moz-range-thumb {
+		outline: 2px solid #fff;
+		outline-offset: 2px;
+	}
+
+	input[type="color"] {
+		appearance: none;
+		-webkit-appearance: none;
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+	}
+
+	input[type="color"]::-webkit-color-swatch-wrapper {
+		padding: 0;
+	}
+
+	input[type="color"]::-webkit-color-swatch {
+		border: none;
+		border-radius: 8px;
+	}
+
+	input[type="color"]::-moz-color-swatch {
+		border: none;
+		border-radius: 8px;
+	}
+}
