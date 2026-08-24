@@ -43,6 +43,7 @@
 	"scripts": {
 		"build": "pkgroll",
 		"cli": "node src/cli/index.ts",
+		"web:build": "pnpm --filter web build",
 		"web:dev": "pnpm --filter web dev",
 		"lint": "lintroll --cache --git --node",
 		"test": "node tests/index.ts",
