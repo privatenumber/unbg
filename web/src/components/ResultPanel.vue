@@ -5,7 +5,9 @@ import { IconCircleAlert, IconDownload, IconLoaderCircle } from '../icons.ts';
 import { formatBytes, rgbToCss } from '../lib/format.ts';
 import BackdropToggle from './BackdropToggle.vue';
 
-const { image1, image2, result, status, error } = useMattingStore();
+const {
+	image1, image2, result, status, error,
+} = useMattingStore();
 
 const trimSeparators = (value: string) => value.replaceAll(/^[\s._-]+|[\s._-]+$/g, '');
 
@@ -24,7 +26,11 @@ const downloadName = computed(() => {
 	const firstStem = fileStem(first.name);
 	const secondStem = fileStem(second.name);
 	let length = 0;
-	while (length < firstStem.length && length < secondStem.length && firstStem[length] === secondStem[length]) {
+	while (
+		length < firstStem.length
+		&& length < secondStem.length
+		&& firstStem[length] === secondStem[length]
+	) {
 		length += 1;
 	}
 

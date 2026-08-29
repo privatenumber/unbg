@@ -43,7 +43,9 @@ const {
 			<label class="flex cursor-pointer items-start justify-between gap-3">
 				<span>
 					<span class="block text-sm text-zinc-300">Crop transparent edges</span>
-					<span class="mt-1 block text-xs leading-relaxed text-zinc-600">Trim empty space around the extracted image.</span>
+					<span class="mt-1 block text-xs leading-relaxed text-zinc-600">
+						Trim empty space around the extracted image.
+					</span>
 				</span>
 				<span class="relative mt-0.5 inline-flex h-5 w-9 shrink-0">
 					<input
@@ -53,8 +55,21 @@ const {
 						:aria-checked="options.crop"
 						class="peer sr-only"
 					>
-					<span aria-hidden="true" class="h-full w-full rounded-full bg-line transition-colors peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-white" />
-					<span aria-hidden="true" class="absolute left-0.5 top-0.5 size-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
+					<span
+						aria-hidden="true"
+						class="
+							h-full w-full rounded-full bg-line transition-colors peer-checked:bg-accent
+							peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2
+							peer-focus-visible:outline-white
+						"
+					/>
+					<span
+						aria-hidden="true"
+						class="
+							absolute left-0.5 top-0.5 size-4 rounded-full bg-white transition-transform
+							peer-checked:translate-x-4
+						"
+					/>
 				</span>
 			</label>
 		</div>
