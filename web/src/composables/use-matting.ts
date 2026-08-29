@@ -44,6 +44,7 @@ export type MattingOptions = {
 	threshold: number;
 	floor: number;
 	ceiling: number;
+	crop: boolean;
 };
 
 /**
@@ -86,6 +87,7 @@ const createDefaultOptions = (): MattingOptions => ({
 	threshold: 10,
 	floor: 0,
 	ceiling: 1,
+	crop: true,
 });
 
 /**
@@ -179,7 +181,7 @@ export const createMattingStore = ({
 
 	const produce = async (isCurrent: () => boolean) => {
 		try {
-			const matte = await processor.matte(buildMatteOptions());
+			const matte = await processor.matte(buildMatteOptions(), options.crop);
 			if (!isCurrent()) {
 				return;
 			}

@@ -6,7 +6,7 @@ import type {
 export type MattingProcessor = {
 	setImage: (slot: ImageSlot, image: RgbaImage) => void;
 	clearImage: (slot: ImageSlot) => void;
-	matte: (options: DifferenceMattingOptions) => Promise<MattingOutput>;
+	matte: (options: DifferenceMattingOptions, crop: boolean) => Promise<MattingOutput>;
 	invalidate: () => void;
 	dispose: () => void;
 };
@@ -59,7 +59,7 @@ export const createMattingProcessor = (): MattingProcessor => {
 				slot,
 			} satisfies MattingWorkerRequest);
 		},
-		matte: (options) => {
+		matte: (options, crop) => {
 			nextRequestId += 1;
 			const deferred = Promise.withResolvers<MattingOutput>();
 			pending.set(nextRequestId, deferred);
@@ -67,6 +67,7 @@ export const createMattingProcessor = (): MattingProcessor => {
 				type: 'matte',
 				requestId: nextRequestId,
 				options,
+				crop,
 			} satisfies MattingWorkerRequest);
 			return deferred.promise;
 		},

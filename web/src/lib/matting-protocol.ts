@@ -28,6 +28,7 @@ export type MattingWorkerRequest =
 		type: 'matte';
 		requestId: number;
 		options: DifferenceMattingOptions;
+		crop: boolean;
 	};
 
 export type MattingWorkerResponse =

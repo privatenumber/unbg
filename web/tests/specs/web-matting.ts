@@ -51,6 +51,7 @@ const createTestIo = () => {
 	const decodedSources: Blob[] = [];
 	const revokedUrls: string[] = [];
 	const receivedImages: Partial<Record<ImageSlot, RgbaImage>> = {};
+	const receivedCrop: boolean[] = [];
 	let urlId = 0;
 	let disposed = false;
 	let invalidationCount = 0;
@@ -71,7 +72,8 @@ const createTestIo = () => {
 		clearImage: (slot) => {
 			receivedImages[slot] = undefined;
 		},
-		matte: () => {
+		matte: (_options, crop) => {
+			receivedCrop.push(crop);
 			const deferred = Promise.withResolvers<MattingOutput>();
 			mattes.push(deferred);
 			return deferred.promise;
@@ -109,6 +111,7 @@ const createTestIo = () => {
 		decodedSources,
 		revokedUrls,
 		receivedImages,
+		receivedCrop,
 		isDisposed: () => disposed,
 		getInvalidationCount: () => invalidationCount,
 		resolveDecode: (source: Blob, image: RgbaImage) => {
@@ -134,6 +137,29 @@ const createStore = (io: MattingIo) => {
 };
 
 describe('web matting', () => {
+	test('crops by default and reruns when crop changes', async () => {
+		const browser = createTestIo();
+		const { store, scope } = createStore(browser.io);
+		try {
+			const first = pngFile('white.png');
+			const second = pngFile('black.png');
+			browser.resolveDecode(first, solidImage(255, 255, 255));
+			browser.resolveDecode(second, solidImage(0, 0, 0));
+
+			await store.setImage(1, first);
+			await store.setImage(2, second);
+			await tick();
+
+			expect(browser.receivedCrop).toStrictEqual([true]);
+			store.options.crop = false;
+			await tick();
+
+			expect(browser.receivedCrop).toStrictEqual([true, false]);
+		} finally {
+			scope.stop();
+		}
+	});
+
 	test('does not let a stale matte result land after an image is cleared', async () => {
 		const browser = createTestIo();
 		const { store, scope } = createStore(browser.io);

@@ -1,4 +1,4 @@
-import { differenceMatting, type RgbaImage } from '../lib/core.ts';
+import { cropTransparent, differenceMatting, type RgbaImage } from '../lib/core.ts';
 import type {
 	ImageSlot, MattingWorkerRequest, MattingWorkerResponse,
 } from '../lib/matting-protocol.ts';
@@ -57,13 +57,14 @@ const runMatte = async (request: MatteRequest) => {
 
 	try {
 		const matte = differenceMatting(image1, image2, request.options);
+		const imageData = request.crop ? cropTransparent(matte) : matte;
 		// Let queued image changes cancel this request before PNG encoding starts.
 		await yieldToMessageQueue();
 		if (operationRevision !== revision) {
 			return;
 		}
 
-		const image = await encodePng(matte);
+		const image = await encodePng(imageData);
 		if (operationRevision !== revision) {
 			return;
 		}
@@ -73,8 +74,8 @@ const runMatte = async (request: MatteRequest) => {
 			requestId: request.requestId,
 			output: {
 				image,
-				width: matte.width,
-				height: matte.height,
+				width: imageData.width,
+				height: imageData.height,
 				background1: matte.background1,
 				background2: matte.background2,
 				backgroundDistance: matte.backgroundDistance,
