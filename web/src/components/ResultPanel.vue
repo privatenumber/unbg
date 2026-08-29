@@ -5,7 +5,32 @@ import { IconCircleAlert, IconDownload, IconLoaderCircle } from '../icons.ts';
 import { formatBytes, rgbToCss } from '../lib/format.ts';
 import BackdropToggle from './BackdropToggle.vue';
 
-const { result, status, error } = useMattingStore();
+const { image1, image2, result, status, error } = useMattingStore();
+
+const trimSeparators = (value: string) => value.replaceAll(/^[\s._-]+|[\s._-]+$/g, '');
+
+const fileStem = (name: string) => {
+	const extensionIndex = name.lastIndexOf('.');
+	return extensionIndex > 0 ? name.slice(0, extensionIndex) : name;
+};
+
+const downloadName = computed(() => {
+	const first = image1.value;
+	const second = image2.value;
+	if (!first || !second) {
+		return 'unbg.png';
+	}
+
+	const firstStem = fileStem(first.name);
+	const secondStem = fileStem(second.name);
+	let length = 0;
+	while (length < firstStem.length && length < secondStem.length && firstStem[length] === secondStem[length]) {
+		length += 1;
+	}
+
+	const name = trimSeparators(firstStem.slice(0, length)) || firstStem;
+	return `unbg-${name}.png`;
+});
 
 const weakBackgrounds = computed(() => {
 	const current = result.value;
@@ -39,7 +64,7 @@ const previewStyle = computed(() => {
 			<a
 				v-if="result && status !== 'error'"
 				:href="result.url"
-				download="unbg.png"
+				:download="downloadName"
 				class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3.5 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
 			>
 				<IconDownload class="size-4" />
