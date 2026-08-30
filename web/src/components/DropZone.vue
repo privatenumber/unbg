@@ -114,7 +114,7 @@ const remove = (event: Event) => {
 				class="flex items-start gap-1.5 border-t border-amber-500/20 bg-amber-500/[0.06] px-4 py-2 text-[11px] leading-relaxed text-amber-400/90"
 			>
 				<IconTriangleAlert class="mt-px size-3.5 shrink-0" />
-				Lossy input — difference matting needs lossless pixels. JPEG and lossy WebP can desync the pair and corrupt the result.
+				Lossy input. Difference matting needs lossless pixels. JPEG and lossy WebP can desync the pair and corrupt the result.
 			</p>
 		</template>
 

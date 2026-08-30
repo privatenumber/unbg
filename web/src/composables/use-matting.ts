@@ -123,7 +123,7 @@ export const createMattingStore = ({
 	debounceMs = 120,
 }: CreateMattingStoreOptions = {}) => {
 	// Images and the result hold immutable objects with large binary payloads,
-	// and are only ever replaced wholesale — `shallowRef` skips deep proxying.
+	// and are only ever replaced wholesale. `shallowRef` skips deep proxying.
 	const image1 = shallowRef<LoadedImage | null>(null);
 	const image2 = shallowRef<LoadedImage | null>(null);
 	const options = reactive(createDefaultOptions());
@@ -132,7 +132,7 @@ export const createMattingStore = ({
 	const status = ref<Status>('idle');
 	const error = ref<string | null>(null);
 
-	// The output area only appears once there's something to show — never as an
+	// The output area only appears once there's something to show, never as an
 	// empty panel on landing.
 	const showOutput = computed(() => (
 		Boolean(result.value) || status.value === 'processing' || status.value === 'error'

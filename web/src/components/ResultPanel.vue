@@ -113,7 +113,7 @@ const previewStyle = computed(() => {
 				<span class="text-sm">Extracting transparency…</span>
 			</div>
 
-			<!-- Preview backdrop toggle (visual only — the downloaded PNG is unchanged) -->
+			<!-- Preview backdrop toggle. The downloaded PNG is unchanged. -->
 			<BackdropToggle
 				v-if="showResult"
 				v-model="backdropColor"
@@ -149,7 +149,7 @@ const previewStyle = computed(() => {
 				v-if="weakBackgrounds"
 				class="text-amber-400/80"
 			>
-				backgrounds too similar — use more distinct colors
+				backgrounds too similar. Use more distinct colors
 			</span>
 		</footer>
 	</section>

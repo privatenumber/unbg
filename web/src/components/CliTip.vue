@@ -15,7 +15,7 @@ import Disclosure from './Disclosure.vue';
 			</span>
 		</template>
 		<p class="text-sm leading-relaxed text-zinc-400">
-			Run unbg locally from your own terminal — no website needed. You can even have coding agents like Claude Code and Codex automate it for you (it ships an agent skill):
+			Run unbg locally from your own terminal. No website needed. Coding agents like Claude Code and Codex can also automate it with the included agent skill:
 		</p>
 		<pre class="mt-3 overflow-x-auto rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 font-mono text-xs text-zinc-300"><code>npx unbg on-white.png on-black.png</code></pre>
 	</Disclosure>

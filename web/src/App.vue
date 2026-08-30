@@ -7,6 +7,7 @@ import AppHero from './components/AppHero.vue';
 import CliTip from './components/CliTip.vue';
 import ImageInputs from './components/ImageInputs.vue';
 import ResultPanel from './components/ResultPanel.vue';
+import WorkflowGuide from './components/WorkflowGuide.vue';
 
 const { showOutput } = provideMatting();
 </script>
@@ -16,10 +17,10 @@ const { showOutput } = provideMatting();
 		<AppHeader />
 
 		<main class="flex-1">
-			<AppHero>
-				<CliTip />
-			</AppHero>
+			<AppHero />
+			<WorkflowGuide />
 			<ImageInputs />
+			<CliTip />
 
 			<div
 				v-if="showOutput"

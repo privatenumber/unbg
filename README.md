@@ -4,30 +4,41 @@
 	unbg
 </h1>
 
-Strip a solid background to full transparency by comparing **two images of the same subject on different background colors**.
+Create a transparent PNG from an AI-generated or existing image. Give unbg **two matching versions of the image on different solid background colors**, and it diffs the background out.
 
-Unlike cutout tools that guess at a mask, unbg solves the compositing equation directly (_difference matting_). Because it has two real observations of every pixel, it recovers soft edges, anti-aliasing, glows, and partial transparency — not just a hard outline.
+Unlike cutout tools that guess at a mask, unbg solves the compositing equation directly (_difference matting_). Because it has two observations of every pixel, it can recover soft edges, anti-aliasing, glows, and partial transparency instead of producing only a hard outline.
 
-For example, a logo generated with Gemini on a white background and then re-rendered on black gives a clean transparent PNG:
+## Quick start
+
+1. **Start with one solid-background image.** Keep an AI-generated or existing image if its background is already flat and solid. Otherwise, use an AI image editor such as Gemini Nano Banana to put it on a solid color.
+2. **Edit only the background.** Ask the AI for a matching version on a distinctly different solid color. Black and white are the simplest pair: if the original is black, make the second one white.
+3. **Give both versions to unbg.** Download the transparent PNG.
+
+Prompt for the second image:
+
+> Keep the subject, composition, dimensions, lighting, colors, and every visible detail unchanged. Change only the background to a flat solid [TARGET COLOR, e.g. pure white (#ffffff)]. Do not move, redraw, resize, or restyle the subject.
+
+Always edit the first solid-background image to make the second one. Do not generate both images separately: even a small change in the subject's position or details will appear in the result.
+
+For example, a logo generated with Gemini on white and then edited onto black gives unbg the pair it needs:
 
 | On white | On black | Output |
 | :---: | :---: | :---: |
 | ![Logo on a white background](.github/media/example-on-white.webp) | ![The same logo on a black background](.github/media/example-on-black.webp) | ![Recovered transparent PNG, shown on a checkerboard](.github/media/example-output.webp) |
-| Base image | Ask an AI to only change the background color | Diff the BG out |
+| Generate or edit onto white | Edit only the background to black | Diff the background out |
 
 ### Try it online ⚡️
 
-No install required — **[unbg runs entirely in your browser](https://unbg.hirok.io/)**. Drop in the two images, tune the controls, and download the transparent PNG. Nothing is uploaded; the matting runs locally on your device.
+No install required: **[unbg runs entirely in your browser](https://unbg.hirok.io/)**. Drop in the two images and download the transparent PNG. Nothing is uploaded; the matting runs locally on your device.
 
 ### Requirements
 
-- **Same dimensions and pixel-aligned:** the subject must not move between the two images.
+- **Same dimensions and pixel-aligned:** the subject must not move or change between the two images.
 - **Uniform solid backgrounds:** one color each, as flat as possible.
-- **Distinct background colors:** the further apart, the cleaner the result. **Pure black and white are ideal.**
+- **Distinct background colors:** any well-separated colors work, but greater separation produces a cleaner result. **Pure black and white are ideal, not required.**
 - **PNG, JPEG, or WebP input; PNG output:** PNG is the safest input because it is lossless. JPEG and lossy WebP can desync the pair and corrupt the matte.
 
-> [!TIP]
-> The reliable way to get an aligned pair from a generative model is to produce one image, then use its _edit_ feature to swap only the background color. Generating two images from scratch shifts the subject and breaks alignment.
+Generative edits can still introduce small differences. The more faithfully the model preserves the subject, the cleaner the transparent result will be.
 
 ## Install
 
@@ -43,7 +54,7 @@ Or install the CLI globally for repeated use:
 npm install --global unbg
 ```
 
-For programmatic use — the [Node.js API](#nodejs-api) — install it locally in your project instead:
+For programmatic use with the [Node.js API](#nodejs-api), install it locally in your project instead:
 
 ```sh
 npm install unbg
@@ -66,8 +77,8 @@ unbg bg-white.png bg-black.png --output logo.png
 | `--background1 <color>` | Background color of `image1` as hex (`#rrggbb`) or `r,g,b` (default: auto-detect from corners) |
 | `--background2 <color>` | Background color of `image2` (default: auto-detect from corners) |
 | `--threshold <0-255>` | Minimum per-channel background difference for a channel to inform the alpha estimate (default: `10`) |
-| `--floor <0-1>` | Snap alpha at or below this to fully transparent — suppresses background noise (default: `0`, off) |
-| `--ceiling <0-1>` | Snap alpha at or above this to fully opaque — suppresses haze (default: `1`, off) |
+| `--floor <0-1>` | Snap alpha at or below this to fully transparent to suppress background noise (default: `0`, off) |
+| `--ceiling <0-1>` | Snap alpha at or above this to fully opaque to suppress haze (default: `1`, off) |
 | `--crop [0-1]` | Trim transparent edges. An optional alpha threshold only affects the crop bounds; it does not alter retained pixels. |
 
 unbg does not remove a background from only one input. It compares both aligned images to recover alpha, then recovers foreground color from both images equally. Alpha always comes from comparing both images.
@@ -103,14 +114,14 @@ await writeFile('transparent.png', image)
 
 Decodes PNG, JPEG, and WebP inputs with [jSquash](https://github.com/jamsinclair/jSquash) WebAssembly codecs and runs difference matting.
 
-- `image1`, `image2` — opaque PNG, JPEG, or static WebP bytes as a `Buffer` or `Uint8Array`. Read files before calling `unbg()`. Animated WebP and source transparency are not supported.
+- `image1`, `image2`: opaque PNG, JPEG, or static WebP bytes as a `Buffer` or `Uint8Array`. Read files before calling `unbg()`. Animated WebP and source transparency are not supported.
 - `options`
-  - `background1?`, `background2?` — `{ r, g, b }` overrides with finite components from `0` to `255`; auto-detected from corners when omitted.
-  - `channelThreshold?` — minimum per-channel background difference from `0` to `255` (default `10`). Matting throws when no channel meets it.
-  - `floor?` / `ceiling?` — snap alpha to fully transparent / opaque at or below / above these thresholds (0-1), suppressing matte artifacts. `floor` must not exceed `ceiling`. Defaults `0` / `1` (off).
-  - `crop?` — `true` trims transparent edges. A number from `0` to `1` sets the alpha threshold used only to calculate the crop bounds.
+  - `background1?`, `background2?`: `{ r, g, b }` overrides with finite components from `0` to `255`; auto-detected from corners when omitted.
+  - `channelThreshold?`: minimum per-channel background difference from `0` to `255` (default `10`). Matting throws when no channel meets it.
+  - `floor?` / `ceiling?`: snap alpha to fully transparent / opaque at or below / above these thresholds (0-1), suppressing matte artifacts. `floor` must not exceed `ceiling`. Defaults `0` / `1` (off).
+  - `crop?`: `true` trims transparent edges. A number from `0` to `1` sets the alpha threshold used only to calculate the crop bounds.
 
-- **Returns** `{ image, width, height, background1, background2, backgroundDistance }`, where `image` is the **PNG-encoded bytes** (`Uint8Array`) of the result. unbg never writes files — persist it with `fs.writeFile`, return it from a server, or upload it. For raw pixels or a different encoding, import `differenceMatting` from `unbg/core`.
+- **Returns** `{ image, width, height, background1, background2, backgroundDistance }`, where `image` is the **PNG-encoded bytes** (`Uint8Array`) of the result. unbg never writes files. Persist it with `fs.writeFile`, return it from a server, or upload it. For raw pixels or a different encoding, import `differenceMatting` from `unbg/core`.
 
 `backgroundDistance` is the Euclidean distance between the two background colors (0-441.7). Below ~50 the extraction is noisy; use more distinct backgrounds.
 
@@ -124,7 +135,7 @@ import { cropTransparent, detectBackground, differenceMatting } from 'unbg/core'
 
 #### `differenceMatting(image1, image2, options?)`
 
-Lower-level core that operates on opaque `RgbaImage` objects — `{ data, width, height }`, where `data` is a raw RGBA `Uint8Array` of `width * height * 4` bytes — with no codec or I/O. Returns the matte as an `RgbaImage` plus `{ background1, background2, backgroundDistance }`. Use it when you already have decoded pixel data. `cropTransparent(image, threshold?)` accepts transparent RGBA data and trims transparent edges; `threshold` is a normalized alpha value used only for the crop bounds.
+Lower-level core that operates on opaque `RgbaImage` objects: `{ data, width, height }`, where `data` is a raw RGBA `Uint8Array` of `width * height * 4` bytes. It has no codec or I/O. Returns the matte as an `RgbaImage` plus `{ background1, background2, backgroundDistance }`. Use it when you already have decoded pixel data. `cropTransparent(image, threshold?)` accepts transparent RGBA data and trims transparent edges; `threshold` is a normalized alpha value used only for the crop bounds.
 
 #### `detectBackground(image)`
 
@@ -138,7 +149,7 @@ unbg ships an [agent skill](https://agentskills.io) that [`skills-npm`](https://
 
 ## How it works
 
-The technique — generate on white, edit to black, diff to recover alpha — comes from Julien De Luca's [_Generating transparent background images with Nano Banana Pro 2_](https://medium.com/@jidefr/generating-transparent-background-images-with-nano-banana-pro-2-1866c88a33c5).
+The technique of generating on white, editing to black, then diffing to recover alpha comes from Julien De Luca's [_Generating transparent background images with Nano Banana Pro 2_](https://medium.com/@jidefr/generating-transparent-background-images-with-nano-banana-pro-2-1866c88a33c5).
 
 A photo over a solid background is a blend of the foreground and the background, weighted by the pixel's opacity:
 
@@ -146,7 +157,7 @@ A photo over a solid background is a blend of the foreground and the background,
 observed = α·foreground + (1 - α)·background
 ```
 
-Shoot the same subject over two known backgrounds and you get two equations per pixel — enough to solve for both the opacity (`α`) and the original foreground color:
+Shoot the same subject over two known backgrounds and you get two equations per pixel. This is enough to solve for both the opacity (`α`) and the original foreground color:
 
 ```
 α = 1 - (observed₁ - observed₂) / (background₁ - background₂)

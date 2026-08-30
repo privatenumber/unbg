@@ -17,7 +17,7 @@ const fetchImage = async (url: string, name: string): Promise<File> => {
 
 const loadExample = () => {
 	// The two example renders aren't pixel-identical, so the solid areas would
-	// otherwise come out slightly translucent — snap near-opaque alpha to fully
+	// otherwise come out slightly translucent. Snap near-opaque alpha to fully
 	// opaque so the demo reads cleanly.
 	reset();
 	options.ceiling = 0.8;
@@ -33,7 +33,10 @@ const loadExample = () => {
 
 <template>
 	<!-- eslint-disable @stylistic/max-len -- Tailwind utility class strings -->
-	<div>
+	<div
+		id="image-inputs"
+		class="scroll-mt-6"
+	>
 		<div
 			v-if="!image1 && !image2"
 			class="mb-3 flex justify-end"
@@ -52,8 +55,8 @@ const loadExample = () => {
 			<div class="md:flex-1">
 				<DropZone
 					:step="1"
-					label="Drop your first image"
-					hint="Subject on a solid background — e.g. white"
+					label="Drop the first image"
+					hint="Your subject on a flat solid background"
 					:image="image1"
 					@select="setImage(1, $event)"
 					@clear="clearImage(1)"
@@ -67,8 +70,8 @@ const loadExample = () => {
 			<div class="md:flex-1">
 				<DropZone
 					:step="2"
-					label="Drop the second image"
-					hint="Same subject, different color — e.g. black"
+					label="Drop the matching image"
+					hint="Same subject, distinctly different background"
 					:image="image2"
 					@select="setImage(2, $event)"
 					@clear="clearImage(2)"
