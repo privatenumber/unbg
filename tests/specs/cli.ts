@@ -179,4 +179,67 @@ describe('cli', () => {
 		expect(clippingResult.width).toBe(4);
 		expect(clippingResult.height).toBe(4);
 	});
+
+	test('accepts explicit crop disabling and numeric endpoints', async () => {
+		const width = 8;
+		const height = 8;
+		const scene = createScene(width, height, {
+			r: 30,
+			g: 144,
+			b: 255,
+		});
+		await using fixture = await createFixture({
+			'a.png': await toPng(composite(scene, white), width, height),
+			'b.png': await toPng(composite(scene, black), width, height),
+		});
+
+		await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop=false',
+			'--output',
+			fixture.getPath('disabled.png'),
+		);
+		await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop=0',
+			'--output',
+			fixture.getPath('zero.png'),
+		);
+		await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop=1',
+			'--output',
+			fixture.getPath('one.png'),
+		);
+
+		const disabled = await decodeImage(await fixture.readFile('disabled.png'));
+		const zero = await decodeImage(await fixture.readFile('zero.png'));
+		const one = await decodeImage(await fixture.readFile('one.png'));
+		expect(disabled.width).toBe(8);
+		expect(zero.width).toBe(6);
+		expect(one.width).toBe(1);
+	});
+
+	test('rejects invalid crop values before reading images', async () => {
+		for (const value of ['-0.1', '1.1', 'abc']) {
+			let failure: {
+				code?: number;
+				stderr?: string;
+			} | undefined;
+			try {
+				await run('first.png', 'second.png', `--crop=${value}`);
+			} catch (error) {
+				failure = error as {
+					code?: number;
+					stderr?: string;
+				};
+			}
+
+			expect(failure?.code).toBe(1);
+			expect(failure?.stderr).toMatch('Crop threshold must be between 0 and 1');
+		}
+	});
 });
