@@ -47,6 +47,30 @@ describe('draft controls', () => {
 		expect(wrapper.emitted('update:floor')).toStrictEqual([[0.2]]);
 	});
 
+	test('keeps both alpha inputs on a common 0-1 scale', async () => {
+		const wrapper = mount(AlphaRangeControl, {
+			props: {
+				floor: 0.1,
+				ceiling: 0.9,
+				hint: 'Snap alpha outside the selected range.',
+			},
+		});
+		const [floor, ceiling] = wrapper.findAll<HTMLInputElement>('input');
+
+		floor.element.value = '0.2';
+		await floor.trigger('input');
+		await floor.trigger('change');
+
+		ceiling.element.value = '0.8';
+		await ceiling.trigger('input');
+		await ceiling.trigger('change');
+
+		expect(floor.element.min).toBe('0');
+		expect(floor.element.max).toBe('1');
+		expect(ceiling.element.min).toBe('0');
+		expect(ceiling.element.max).toBe('1');
+	});
+
 	test('commits a manual background color only after change', async () => {
 		const wrapper = mount(BackgroundField, {
 			props: {
