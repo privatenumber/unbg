@@ -274,6 +274,30 @@ describe('web matting', () => {
 		}
 	});
 
+	test('hides a stale result while a new matte is pending', async () => {
+		const browser = createTestIo();
+		const { store, scope } = createStore(browser.io);
+		try {
+			const first = pngFile('white.png');
+			const second = pngFile('black.png');
+			browser.resolveDecode(first, solidImage(255, 255, 255));
+			browser.resolveDecode(second, solidImage(0, 0, 0));
+			await store.setImage(1, first);
+			await store.setImage(2, second);
+			await tick();
+			browser.mattes[0].resolve(matteOutput());
+			await tick();
+
+			expect(store.status.value).toBe('idle');
+			store.options.floor = 0.1;
+			await nextTick();
+
+			expect(store.status.value).toBe('processing');
+		} finally {
+			scope.stop();
+		}
+	});
+
 	test('does not let a stale matte result land after an image is cleared', async () => {
 		const browser = createTestIo();
 		const { store, scope } = createStore(browser.io);

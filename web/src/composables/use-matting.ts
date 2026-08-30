@@ -171,6 +171,12 @@ export const createMattingStore = ({
 		}
 	};
 
+	const markResultStale = () => {
+		if (result.value) {
+			status.value = 'processing';
+		}
+	};
+
 	// The complete input boundary for a matte. Everything downstream, including
 	// crop metadata and the cropped PNG, belongs to this exact snapshot.
 	const matteRequest = computed<MatteRequest>(() => ({
@@ -365,6 +371,7 @@ export const createMattingStore = ({
 		processing.invalidate();
 		cropProcessing.invalidate();
 		processor.invalidate();
+		markResultStale();
 		cropPreviewActive.value = false;
 		matteSchedulePending = true;
 		clearTimeout(debounce);
@@ -394,6 +401,7 @@ export const createMattingStore = ({
 		processing.invalidate();
 		cropProcessing.invalidate();
 		processor.invalidate();
+		markResultStale();
 		cropPreviewActive.value = false;
 
 		let file: File;
@@ -440,6 +448,7 @@ export const createMattingStore = ({
 		decoding[slot].invalidate();
 		cropProcessing.invalidate();
 		processor.invalidateCrop();
+		markResultStale();
 		processor.clearImage(slot);
 		const target = slot === 1 ? image1 : image2;
 		revokePreview(target.value);
