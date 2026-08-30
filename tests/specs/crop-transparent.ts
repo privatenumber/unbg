@@ -153,4 +153,48 @@ describe('cropContent', () => {
 			height: 1,
 		});
 	});
+
+	test('retains an edge at exactly 1% foreground density', () => {
+		const width = 100;
+		const height = 100;
+		const data = new Uint8Array(width * height * 4);
+		const setPixel = (x: number, y: number) => {
+			data[((y * width) + x) * 4 + 3] = 255;
+		};
+
+		setPixel(50, 0);
+		for (let y = 20; y < 80; y += 1) {
+			for (let x = 20; x < 80; x += 1) {
+				setPixel(x, y);
+			}
+		}
+
+		expect(findContentBounds({
+			data,
+			width,
+			height,
+		})).toStrictEqual({
+			x: 20,
+			y: 0,
+			width: 60,
+			height: 80,
+		});
+	});
+
+	test('keeps valid bounds for one- and two-pixel images', () => {
+		expect(findContentBounds(image(1, 1, [[0, 0, 10, 20, 30, 255]]))).toStrictEqual({
+			x: 0,
+			y: 0,
+			width: 1,
+			height: 1,
+		});
+		expect(findContentBounds(image(2, 1, [[
+			1, 0, 10, 20, 30, 255,
+		]]))).toStrictEqual({
+			x: 1,
+			y: 0,
+			width: 1,
+			height: 1,
+		});
+	});
 });
