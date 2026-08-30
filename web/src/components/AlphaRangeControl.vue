@@ -141,7 +141,7 @@ const updateClosestHandle = (event: PointerEvent) => {
 	position: absolute;
 	top: 50%;
 	height: var(--slider-track-height);
-	border-radius: inherit;
+	border-radius: 999px;
 	background: var(--color-accent);
 	pointer-events: none;
 	transform: translateY(-50%);
