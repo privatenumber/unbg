@@ -4,9 +4,10 @@ import { useMattingStore } from '../composables/use-matting.ts';
 import { IconCircleAlert, IconDownload, IconLoaderCircle } from '../icons.ts';
 import { formatBytes, rgbToCss } from '../lib/format.ts';
 import BackdropToggle from './BackdropToggle.vue';
+import CropPreviewCanvas from './CropPreviewCanvas.vue';
 
 const {
-	image1, image2, result, status, error,
+	image1, image2, result, status, error, cropPreviewValue, cropPreviewActive,
 } = useMattingStore();
 
 const trimSeparators = (value: string) => value.replaceAll(/^[\s._-]+|[\s._-]+$/g, '');
@@ -68,7 +69,7 @@ const previewStyle = computed(() => {
 				/>
 			</div>
 			<a
-				v-if="result && status !== 'error'"
+				v-if="result && status === 'idle'"
 				:href="result.url"
 				:download="downloadName"
 				class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3.5 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
@@ -97,12 +98,25 @@ const previewStyle = computed(() => {
 			</div>
 
 			<!-- Result preview -->
-			<img
-				v-else-if="result"
-				:src="result.url"
-				alt="Extracted transparent image"
-				class="max-h-[24rem] max-w-full object-contain fade-in"
-			>
+			<template v-else-if="result">
+				<CropPreviewCanvas
+					v-if="result.mattePreviewUrl"
+					v-show="cropPreviewActive"
+					:source-url="result.mattePreviewUrl"
+					:source-width="result.cropMetadata.width"
+					:source-height="result.cropMetadata.height"
+					:crop="cropPreviewValue"
+					:metadata="result.cropMetadata"
+					:visible="cropPreviewActive"
+					class="fade-in"
+				/>
+				<img
+					v-show="!cropPreviewActive"
+					:src="result.url"
+					alt="Extracted transparent image"
+					class="max-h-[24rem] max-w-full object-contain fade-in"
+				>
+			</template>
 
 			<!-- Processing (first run, no prior result) -->
 			<div

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 defineProps<{
 	hint: string;
@@ -8,6 +8,37 @@ defineProps<{
 const floor = defineModel<number>('floor', { required: true });
 const ceiling = defineModel<number>('ceiling', { required: true });
 const activeHandle = ref<'floor' | 'ceiling'>('ceiling');
+const draftFloor = ref(floor.value);
+const draftCeiling = ref(ceiling.value);
+
+watch([floor, ceiling], ([nextFloor, nextCeiling]) => {
+	draftFloor.value = nextFloor;
+	draftCeiling.value = nextCeiling;
+});
+
+const readValue = (event: Event) => Number((event.currentTarget as HTMLInputElement).value);
+
+const updateFloor = (event: Event) => {
+	draftFloor.value = Math.min(readValue(event), draftCeiling.value);
+};
+
+const updateCeiling = (event: Event) => {
+	draftCeiling.value = Math.max(readValue(event), draftFloor.value);
+};
+
+const commit = () => {
+	if (floor.value !== draftFloor.value) {
+		floor.value = draftFloor.value;
+	}
+	if (ceiling.value !== draftCeiling.value) {
+		ceiling.value = draftCeiling.value;
+	}
+};
+
+const cancel = () => {
+	draftFloor.value = floor.value;
+	draftCeiling.value = ceiling.value;
+};
 
 const updateClosestHandle = (event: PointerEvent) => {
 	if (event.target instanceof HTMLInputElement) {
@@ -17,14 +48,15 @@ const updateClosestHandle = (event: PointerEvent) => {
 	const track = event.currentTarget as HTMLDivElement;
 	const position = (event.clientX - track.getBoundingClientRect().left) / track.clientWidth;
 	const value = Math.round(Math.min(Math.max(position, 0), 1) * 100) / 100;
-	if (value - floor.value <= ceiling.value - value) {
-		floor.value = Math.min(value, ceiling.value);
+	if (value - draftFloor.value <= draftCeiling.value - value) {
+		draftFloor.value = Math.min(value, draftCeiling.value);
 		activeHandle.value = 'floor';
-		return;
+	} else {
+		draftCeiling.value = Math.max(value, draftFloor.value);
+		activeHandle.value = 'ceiling';
 	}
 
-	ceiling.value = Math.max(value, floor.value);
-	activeHandle.value = 'ceiling';
+	commit();
 };
 </script>
 
@@ -35,7 +67,7 @@ const updateClosestHandle = (event: PointerEvent) => {
 				Alpha thresholds
 			</span>
 			<span class="font-mono text-xs tabular-nums text-zinc-500">
-				{{ floor.toFixed(2) }} - {{ ceiling.toFixed(2) }}
+				{{ draftFloor.toFixed(2) }} - {{ draftCeiling.toFixed(2) }}
 			</span>
 		</legend>
 		<div
@@ -45,32 +77,40 @@ const updateClosestHandle = (event: PointerEvent) => {
 			<div
 				class="alpha-range-selection"
 				:style="{
-					left: `${floor * 100}%`,
-					right: `${(1 - ceiling) * 100}%`,
+					left: `${draftFloor * 100}%`,
+					right: `${(1 - draftCeiling) * 100}%`,
 				}"
 			/>
 			<input
-				v-model.number="floor"
+				:value="draftFloor"
 				class="alpha-range-input"
 				:class="{ 'alpha-range-input-active': activeHandle === 'floor' }"
 				type="range"
 				min="0"
-				:max="ceiling"
+				:max="draftCeiling"
 				step="0.01"
 				aria-label="Alpha floor"
-				:aria-valuetext="`Floor ${floor.toFixed(2)}`"
+				:aria-valuetext="`Floor ${draftFloor.toFixed(2)}`"
+				@blur="cancel"
+				@change="commit"
+				@input="updateFloor"
+				@pointercancel="cancel"
 				@pointerdown="activeHandle = 'floor'"
 			>
 			<input
-				v-model.number="ceiling"
+				:value="draftCeiling"
 				class="alpha-range-input"
 				:class="{ 'alpha-range-input-active': activeHandle === 'ceiling' }"
 				type="range"
-				:min="floor"
+				:min="draftFloor"
 				max="1"
 				step="0.01"
 				aria-label="Alpha ceiling"
-				:aria-valuetext="`Ceiling ${ceiling.toFixed(2)}`"
+				:aria-valuetext="`Ceiling ${draftCeiling.toFixed(2)}`"
+				@blur="cancel"
+				@change="commit"
+				@input="updateCeiling"
+				@pointercancel="cancel"
 				@pointerdown="activeHandle = 'ceiling'"
 			>
 		</div>

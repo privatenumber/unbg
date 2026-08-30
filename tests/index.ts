@@ -8,5 +8,6 @@ describe('unbg', () => {
 	import('./specs/unbg.ts');
 	import('./specs/output-path.ts');
 	import('./specs/cli.ts');
+	import('../web/tests/specs/manual-crop-bounds.ts');
 	import('../web/tests/specs/web-matting.ts');
 });

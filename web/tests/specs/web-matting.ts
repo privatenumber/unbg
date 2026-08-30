@@ -1,10 +1,12 @@
-import { effectScope } from 'vue';
+import { effectScope, nextTick } from 'vue';
 import { describe, test, expect } from 'manten';
 import { createMattingStore, type MattingIo } from '../../src/composables/use-matting.ts';
-import type { RgbaImage } from '../../src/lib/core.ts';
+import type { DifferenceMattingOptions, RgbaImage } from '../../src/lib/core.ts';
 import type { DecodedImage } from '../../src/lib/image-codec.ts';
 import type { MattingProcessor } from '../../src/lib/matting-processor.ts';
-import type { ImageSlot, MattingOutput } from '../../src/lib/matting-protocol.ts';
+import type {
+	CropMetadata, CropOutput, CropValue, ImageSlot, MattingOutput,
+} from '../../src/lib/matting-protocol.ts';
 
 const solidImage = (r: number, g: number, b: number): RgbaImage => ({
 	data: new Uint8Array([r, g, b, 255]),
@@ -19,10 +21,25 @@ const decodedImage = (image: RgbaImage): DecodedImage => ({
 	preview: new Blob(['preview'], { type: 'image/png' }),
 });
 
-const matteOutput = (): MattingOutput => ({
-	image: new Blob(['matte'], { type: 'image/png' }),
+const cropMetadata = (): CropMetadata => ({
 	width: 1,
 	height: 1,
+	automaticBounds: {
+		x: 0,
+		y: 0,
+		width: 1,
+		height: 1,
+	},
+	manualBounds: new Int32Array(256 * 4),
+});
+
+const matteOutput = (crop: CropValue = true): MattingOutput => ({
+	image: new Blob(['matte'], { type: 'image/png' }),
+	mattePreview: new Blob(['matte-preview'], { type: 'image/png' }),
+	width: 1,
+	height: 1,
+	crop,
+	cropMetadata: cropMetadata(),
 	background1: {
 		r: 255,
 		g: 255,
@@ -34,6 +51,14 @@ const matteOutput = (): MattingOutput => ({
 		b: 0,
 	},
 	backgroundDistance: Math.sqrt(3 * (255 ** 2)),
+	cropClippingThreshold: 0.5,
+});
+
+const cropOutput = (crop: CropValue): CropOutput => ({
+	image: new Blob(['cropped'], { type: 'image/png' }),
+	width: 1,
+	height: 1,
+	crop,
 });
 
 /** Flush macrotasks so a `debounceMs: 0` run can fire and settle. */
@@ -48,10 +73,13 @@ const tick = () => new Promise((resolve) => {
 const createTestIo = () => {
 	const decodes = new Map<Blob, PromiseWithResolvers<DecodedImage>>();
 	const mattes: PromiseWithResolvers<MattingOutput>[] = [];
+	const crops: PromiseWithResolvers<CropOutput>[] = [];
 	const decodedSources: Blob[] = [];
 	const revokedUrls: string[] = [];
 	const receivedImages: Partial<Record<ImageSlot, RgbaImage>> = {};
-	const receivedCrop: boolean[] = [];
+	const receivedCrop: (boolean | number)[] = [];
+	const receivedCropRequests: CropValue[] = [];
+	const receivedMatteOptions: DifferenceMattingOptions[] = [];
 	let urlId = 0;
 	let disposed = false;
 	let invalidationCount = 0;
@@ -72,16 +100,31 @@ const createTestIo = () => {
 		clearImage: (slot) => {
 			receivedImages[slot] = undefined;
 		},
-		matte: (_options, crop) => {
+		matte: (options, crop) => {
+			receivedMatteOptions.push(options);
 			receivedCrop.push(crop);
 			const deferred = Promise.withResolvers<MattingOutput>();
 			mattes.push(deferred);
+			return deferred.promise;
+		},
+		crop: (crop) => {
+			receivedCropRequests.push(crop);
+			const deferred = Promise.withResolvers<CropOutput>();
+			crops.push(deferred);
 			return deferred.promise;
 		},
 		invalidate: () => {
 			invalidationCount += 1;
 			for (const deferred of mattes) {
 				deferred.reject(new Error('Matte request superseded'));
+			}
+			for (const deferred of crops) {
+				deferred.reject(new Error('Crop request superseded'));
+			}
+		},
+		invalidateCrop: () => {
+			for (const deferred of crops) {
+				deferred.reject(new Error('Crop request superseded'));
 			}
 		},
 		dispose: () => {
@@ -108,10 +151,13 @@ const createTestIo = () => {
 	return {
 		io,
 		mattes,
+		crops,
 		decodedSources,
 		revokedUrls,
 		receivedImages,
 		receivedCrop,
+		receivedCropRequests,
+		receivedMatteOptions,
 		isDisposed: () => disposed,
 		getInvalidationCount: () => invalidationCount,
 		resolveDecode: (source: Blob, image: RgbaImage) => {
@@ -137,7 +183,7 @@ const createStore = (io: MattingIo) => {
 };
 
 describe('web matting', () => {
-	test('crops by default and reruns when crop changes', async () => {
+	test('uses automatic crop by default and crops without rerunning the matte', async () => {
 		const browser = createTestIo();
 		const { store, scope } = createStore(browser.io);
 		try {
@@ -151,10 +197,78 @@ describe('web matting', () => {
 			await tick();
 
 			expect(browser.receivedCrop).toStrictEqual([true]);
+			browser.mattes[0].resolve(matteOutput());
+			await tick();
+
+			store.options.crop = 0.02;
+			await tick();
+
+			expect(browser.receivedCrop).toStrictEqual([true]);
+			expect(browser.receivedCropRequests).toStrictEqual([0.02]);
 			store.options.crop = false;
 			await tick();
 
-			expect(browser.receivedCrop).toStrictEqual([true, false]);
+			expect(browser.receivedCrop).toStrictEqual([true]);
+			expect(browser.receivedCropRequests).toStrictEqual([0.02, false]);
+			store.options.crop = 0.02;
+			await tick();
+
+			expect(browser.receivedCrop).toStrictEqual([true]);
+			expect(browser.receivedCropRequests).toStrictEqual([0.02, false, 0.02]);
+		} finally {
+			scope.stop();
+		}
+	});
+
+	test('coalesces related matte option changes into one invalidation', async () => {
+		const browser = createTestIo();
+		const { store, scope } = createStore(browser.io);
+		try {
+			const first = pngFile('white.png');
+			const second = pngFile('black.png');
+			browser.resolveDecode(first, solidImage(255, 255, 255));
+			browser.resolveDecode(second, solidImage(0, 0, 0));
+			await store.setImage(1, first);
+			await store.setImage(2, second);
+			await tick();
+
+			const invalidationCount = browser.getInvalidationCount();
+			store.options.threshold = 20;
+			store.options.floor = 0.1;
+			store.options.ceiling = 0.9;
+			await nextTick();
+
+			expect(browser.getInvalidationCount()).toBe(invalidationCount + 1);
+		} finally {
+			scope.stop();
+		}
+	});
+
+	test('regenerates crop metadata from each committed matte request', async () => {
+		const browser = createTestIo();
+		const { store, scope } = createStore(browser.io);
+		try {
+			const first = pngFile('white.png');
+			const second = pngFile('black.png');
+			browser.resolveDecode(first, solidImage(255, 255, 255));
+			browser.resolveDecode(second, solidImage(0, 0, 0));
+			await store.setImage(1, first);
+			await store.setImage(2, second);
+			await tick();
+			browser.mattes[0].resolve(matteOutput());
+			await tick();
+
+			store.options.floor = 0.1;
+			await nextTick();
+			await tick();
+			expect(browser.receivedMatteOptions).toHaveLength(2);
+			expect(browser.receivedMatteOptions[1].floor).toBe(0.1);
+
+			const next = matteOutput();
+			browser.mattes[1].resolve(next);
+			await tick();
+
+			expect(store.result.value?.cropMetadata).toBe(next.cropMetadata);
 		} finally {
 			scope.stop();
 		}
@@ -293,6 +407,42 @@ describe('web matting', () => {
 			await tick();
 
 			expect(store.result.value?.backgroundDistance).toBeCloseTo(Math.sqrt(3 * (255 ** 2)), 1);
+			expect(store.result.value?.cropClippingThreshold).toBe(0.5);
+		} finally {
+			scope.stop();
+		}
+	});
+
+	test('tracks and releases diagnostic preview URLs', async () => {
+		const browser = createTestIo();
+		const { store, scope } = createStore(browser.io);
+		try {
+			const first = pngFile('first.png');
+			const second = pngFile('second.png');
+			browser.resolveDecode(first, solidImage(255, 255, 255));
+			browser.resolveDecode(second, solidImage(0, 0, 0));
+
+			await store.setImage(1, first);
+			await store.setImage(2, second);
+			await tick();
+			browser.mattes[0].resolve(matteOutput());
+			await tick();
+
+			const firstResultUrl = store.result.value?.url;
+			const firstMattePreviewUrl = store.result.value?.mattePreviewUrl;
+			store.options.crop = false;
+			await tick();
+			browser.crops[0].resolve(cropOutput(false));
+			await tick();
+
+			expect(store.result.value?.crop).toBe(false);
+			expect(browser.revokedUrls).toContain(firstResultUrl);
+			expect(browser.revokedUrls).not.toContain(firstMattePreviewUrl);
+			const secondResultUrl = store.result.value?.url;
+
+			scope.stop();
+			expect(browser.revokedUrls).toContain(secondResultUrl);
+			expect(browser.revokedUrls).toContain(firstMattePreviewUrl);
 		} finally {
 			scope.stop();
 		}

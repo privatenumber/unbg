@@ -128,7 +128,7 @@ describe('cli', () => {
 		expect(failure?.stderr).toMatch('Invalid color');
 	});
 
-	test('crops with a boolean or numeric threshold', async () => {
+	test('crops automatically or with an explicit numeric threshold', async () => {
 		const width = 8;
 		const height = 8;
 		const scene = createScene(width, height, {
@@ -141,14 +141,14 @@ describe('cli', () => {
 			'b.png': await toPng(composite(scene, black), width, height),
 		});
 
-		await run(
+		const booleanRun = await run(
 			fixture.getPath('a.png'),
 			fixture.getPath('b.png'),
 			'--crop',
 			'--output',
 			fixture.getPath('boolean.png'),
 		);
-		await run(
+		const thresholdRun = await run(
 			fixture.getPath('a.png'),
 			fixture.getPath('b.png'),
 			'--crop',
@@ -156,6 +156,18 @@ describe('cli', () => {
 			'--output',
 			fixture.getPath('threshold.png'),
 		);
+		const clippingRun = await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop',
+			'0.6',
+			'--output',
+			fixture.getPath('clipping.png'),
+		);
+
+		expect(booleanRun.stderr).toMatch('Crop mode: automatic edge-density');
+		expect(thresholdRun.stderr).toMatch('Crop threshold: 0.020');
+		expect(clippingRun.stderr).toMatch('Warning: crop threshold clips non-transparent edge pixels');
 
 		const booleanResult = await decodeImage(await fixture.readFile('boolean.png'));
 		const thresholdResult = await decodeImage(await fixture.readFile('threshold.png'));
@@ -163,5 +175,8 @@ describe('cli', () => {
 		expect(booleanResult.height).toBe(6);
 		expect(thresholdResult.width).toBe(6);
 		expect(thresholdResult.height).toBe(6);
+		const clippingResult = await decodeImage(await fixture.readFile('clipping.png'));
+		expect(clippingResult.width).toBe(4);
+		expect(clippingResult.height).toBe(4);
 	});
 });

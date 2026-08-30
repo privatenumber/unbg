@@ -22,8 +22,8 @@ Extract a transparent foreground from two aligned images with different solid ba
 
 | Symptom | Action |
 | --- | --- |
-| Empty transparent canvas around the subject | Add `--crop`. It trims fully transparent edges without changing retained pixels. |
-| Isolated faint pixels extend the crop bounds | Use a numeric crop threshold, such as `--crop 0.02`. It ignores alpha at or below the threshold only while finding bounds. |
+| Empty or sparse transparent canvas around the subject | Add `--crop`. It trims fully transparent edges and sparse edge rows or columns without changing retained pixels. |
+| Automatic crop removes an intended isolated detail | Use a numeric crop threshold below the detail's alpha, such as `--crop 0.02`. Numeric cropping preserves every pixel above that threshold. |
 | Faint haze remains inside the retained image | Cautiously increase `--floor`, for example `--floor 0.02`. This removes real pixels with alpha at or below the threshold. |
 | Hair, glow, or other soft detail disappears | Lower or remove `--floor`. Do not use `--floor` just to reduce canvas size. |
 | Pixels that should be opaque remain translucent | Cautiously lower `--ceiling`, for example `--ceiling 0.98`. It snaps alpha at or above the threshold to opaque. |
@@ -46,7 +46,7 @@ unbg <image1> <image2> [flags]
 | `--threshold <0-255>` | `10` | Minimum per-channel background difference that informs alpha. |
 | `--floor <0-1>` | `0` | Remove alpha at or below this threshold. |
 | `--ceiling <0-1>` | `1` | Snap alpha at or above this threshold to opaque. |
-| `--crop [0-1]` | off | Trim transparent edges. A numeric threshold affects bounds only. |
+| `--crop [0-1]` | off | Trim transparent edges automatically. A numeric threshold uses exact alpha-based bounds only. |
 
 Backgrounds auto-detect from four corner pixels. Override them when a subject reaches a corner.
 
@@ -60,11 +60,11 @@ const [onWhite, onBlack] = await Promise.all([
     readFile('bg-white.png'),
     readFile('bg-black.png')
 ])
-const { image } = await unbg(onWhite, onBlack, { crop: 0.02 })
+const { image } = await unbg(onWhite, onBlack, { crop: true })
 await writeFile('logo.png', image)
 ```
 
-`unbg` exports only `unbg(image1, image2, options?)`. It accepts opaque `Buffer` or `Uint8Array` image bytes, decodes PNG, JPEG, or static WebP, and returns `Uint8Array` PNG bytes. The caller reads input files. Set `crop` here.
+`unbg` exports only `unbg(image1, image2, options?)`. It accepts opaque `Buffer` or `Uint8Array` image bytes, decodes PNG, JPEG, or static WebP, and returns `Uint8Array` PNG bytes. The caller reads input files. Set `crop` to `true` for automatic edge-density trimming or to a number for exact alpha-based bounds. The result also includes `cropClippingThreshold`, or `null` when the matte has no non-transparent pixels.
 
 ## Core API
 
@@ -73,6 +73,7 @@ Import raw-pixel operations from `unbg/core` when the host already decodes and e
 | Export | Use it for |
 | --- | --- |
 | `differenceMatting(image1, image2, options?)` | Extract a raw RGBA foreground. |
+| `cropContent(image)` | Trim edge rows and columns with fewer than 1% visible pixels from a raw RGBA matte. |
 | `cropTransparent(image, threshold?)` | Crop a raw RGBA matte. A threshold affects only the crop bounds. |
 | `detectBackground(image)` | Inspect the automatic corner-based background color. |
 

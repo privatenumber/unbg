@@ -1,26 +1,49 @@
 import type { DifferenceMattingOptions, RgbaImage } from './core.ts';
 import type {
-	ImageSlot, MattingOutput, MattingWorkerRequest, MattingWorkerResponse,
+	CropOutput,
+	CropValue,
+	ImageSlot,
+	MattingOutput,
+	MattingWorkerRequest,
+	MattingWorkerResponse,
 } from './matting-protocol.ts';
 
 export type MattingProcessor = {
 	setImage: (slot: ImageSlot, image: RgbaImage) => void;
 	clearImage: (slot: ImageSlot) => void;
-	matte: (options: DifferenceMattingOptions, crop: boolean) => Promise<MattingOutput>;
+	matte: (
+		options: DifferenceMattingOptions,
+		crop: CropValue,
+	) => Promise<MattingOutput>;
+	crop: (crop: CropValue) => Promise<CropOutput>;
 	invalidate: () => void;
+	invalidateCrop: () => void;
 	dispose: () => void;
 };
 
 export const createMattingProcessor = (): MattingProcessor => {
 	const worker = new Worker(new URL('../workers/matting.ts', import.meta.url), { type: 'module' });
-	const pending = new Map<number, PromiseWithResolvers<MattingOutput>>();
+	type PendingRequest =
+		| {
+			type: 'matte';
+			deferred: PromiseWithResolvers<MattingOutput>;
+		}
+		| {
+			type: 'crop';
+			deferred: PromiseWithResolvers<CropOutput>;
+		};
+	const pending = new Map<number, PendingRequest>();
 	let nextRequestId = 0;
 
-	const rejectPending = (message: string) => {
-		for (const deferred of pending.values()) {
-			deferred.reject(new Error(message));
+	const rejectPending = (message: string, type?: PendingRequest['type']) => {
+		for (const [requestId, request] of pending) {
+			if (type && request.type !== type) {
+				continue;
+			}
+
+			request.deferred.reject(new Error(message));
+			pending.delete(requestId);
 		}
-		pending.clear();
 	};
 
 	worker.addEventListener('message', ({ data }: MessageEvent<MattingWorkerResponse>) => {
@@ -30,10 +53,17 @@ export const createMattingProcessor = (): MattingProcessor => {
 		}
 
 		pending.delete(data.requestId);
-		if (data.type === 'result') {
-			deferred.resolve(data.output);
+		if (data.type === 'error') {
+			deferred.deferred.reject(new Error(data.message));
+			return;
+		}
+
+		if (data.type === 'matte-result' && deferred.type === 'matte') {
+			deferred.deferred.resolve(data.output);
+		} else if (data.type === 'crop-result' && deferred.type === 'crop') {
+			deferred.deferred.resolve(data.output);
 		} else {
-			deferred.reject(new Error(data.message));
+			deferred.deferred.reject(new Error('Unexpected matting worker response'));
 		}
 	});
 	worker.addEventListener('error', (event) => {
@@ -62,7 +92,10 @@ export const createMattingProcessor = (): MattingProcessor => {
 		matte: (options, crop) => {
 			nextRequestId += 1;
 			const deferred = Promise.withResolvers<MattingOutput>();
-			pending.set(nextRequestId, deferred);
+			pending.set(nextRequestId, {
+				type: 'matte',
+				deferred,
+			});
 			worker.postMessage({
 				type: 'matte',
 				requestId: nextRequestId,
@@ -71,9 +104,27 @@ export const createMattingProcessor = (): MattingProcessor => {
 			} satisfies MattingWorkerRequest);
 			return deferred.promise;
 		},
+		crop: (crop) => {
+			nextRequestId += 1;
+			const deferred = Promise.withResolvers<CropOutput>();
+			pending.set(nextRequestId, {
+				type: 'crop',
+				deferred,
+			});
+			worker.postMessage({
+				type: 'crop',
+				requestId: nextRequestId,
+				crop,
+			} satisfies MattingWorkerRequest);
+			return deferred.promise;
+		},
 		invalidate: () => {
 			worker.postMessage({ type: 'invalidate' } satisfies MattingWorkerRequest);
 			rejectPending('Matte request superseded');
+		},
+		invalidateCrop: () => {
+			worker.postMessage({ type: 'invalidate-crop' } satisfies MattingWorkerRequest);
+			rejectPending('Crop request superseded', 'crop');
 		},
 		dispose: () => {
 			rejectPending('Matting worker disposed');

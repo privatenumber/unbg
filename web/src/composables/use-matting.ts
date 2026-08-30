@@ -8,7 +8,9 @@ import {
 } from '../lib/core.ts';
 import { decodeImage, type DecodedImage } from '../lib/image-codec.ts';
 import { createMattingProcessor, type MattingProcessor } from '../lib/matting-processor.ts';
-import type { ImageSlot } from '../lib/matting-protocol.ts';
+import type {
+	CropMetadata, CropValue, ImageSlot,
+} from '../lib/matting-protocol.ts';
 
 export type Slot = ImageSlot;
 
@@ -26,11 +28,15 @@ export type LoadedImage = {
 
 export type MattingResult = {
 	url: string;
+	mattePreviewUrl: string;
 	width: number;
 	height: number;
+	crop: CropValue;
+	cropMetadata: CropMetadata;
 	background1: Rgb;
 	background2: Rgb;
 	backgroundDistance: number;
+	cropClippingThreshold: number | null;
 	size: number;
 };
 
@@ -44,7 +50,13 @@ export type MattingOptions = {
 	threshold: number;
 	floor: number;
 	ceiling: number;
-	crop: boolean;
+	crop: CropValue;
+};
+
+type MatteRequest = {
+	first: LoadedImage | null;
+	second: LoadedImage | null;
+	options: DifferenceMattingOptions;
 };
 
 /**
@@ -129,6 +141,8 @@ export const createMattingStore = ({
 	const options = reactive(createDefaultOptions());
 
 	const result = shallowRef<MattingResult | null>(null);
+	const cropPreviewValue = ref<CropValue>(options.crop);
+	const cropPreviewActive = ref(false);
 	const status = ref<Status>('idle');
 	const error = ref<string | null>(null);
 
@@ -147,21 +161,29 @@ export const createMattingStore = ({
 	/** Background colors auto-detected from each image's corners (for UI hints). */
 	const detected1 = computed(() => image1.value?.background ?? null);
 	const detected2 = computed(() => image2.value?.background ?? null);
+	const cropClippingThreshold = computed(() => result.value?.cropClippingThreshold ?? null);
 
 	const releaseResult = () => {
 		if (result.value) {
 			io.revokeObjectURL(result.value.url);
+			io.revokeObjectURL(result.value.mattePreviewUrl);
 			result.value = null;
 		}
 	};
 
-	const buildMatteOptions = (): DifferenceMattingOptions => ({
-		background1: options.bg1Auto ? undefined : { ...options.bg1 },
-		background2: options.bg2Auto ? undefined : { ...options.bg2 },
-		channelThreshold: options.threshold,
-		floor: options.floor,
-		ceiling: options.ceiling,
-	});
+	// The complete input boundary for a matte. Everything downstream, including
+	// crop metadata and the cropped PNG, belongs to this exact snapshot.
+	const matteRequest = computed<MatteRequest>(() => ({
+		first: image1.value,
+		second: image2.value,
+		options: {
+			background1: options.bg1Auto ? undefined : { ...options.bg1 },
+			background2: options.bg2Auto ? undefined : { ...options.bg2 },
+			channelThreshold: options.threshold,
+			floor: options.floor,
+			ceiling: options.ceiling,
+		},
+	}));
 
 	const sizeMismatch = (first: LoadedImage, second: LoadedImage): string | null => {
 		if (first.width === second.width && first.height === second.height) {
@@ -173,15 +195,77 @@ export const createMattingStore = ({
 
 	// "Latest wins" guards: the active matte run, and each slot's in-flight decode.
 	const processing = createGeneration();
+	const cropProcessing = createGeneration();
 	const processor = io.createProcessor();
 	const decoding: Record<Slot, ReturnType<typeof createGeneration>> = {
 		1: createGeneration(),
 		2: createGeneration(),
 	};
+	let debounce: ReturnType<typeof setTimeout> | undefined;
+	let matteSchedulePending = false;
+	let mattePendingCount = 0;
 
-	const produce = async (isCurrent: () => boolean) => {
+	const produceCrop = async (crop: CropValue, isCurrent: () => boolean) => {
 		try {
-			const matte = await processor.matte(buildMatteOptions(), options.crop);
+			const cropped = await processor.crop(crop);
+			if (!isCurrent()) {
+				return;
+			}
+
+			const current = result.value;
+			if (!current) {
+				return;
+			}
+
+			const url = io.createObjectURL(cropped.image);
+			io.revokeObjectURL(current.url);
+			result.value = {
+				...current,
+				url,
+				width: cropped.width,
+				height: cropped.height,
+				crop: cropped.crop,
+				size: cropped.image.size,
+			};
+			status.value = 'idle';
+		} catch (error_) {
+			if (!isCurrent()) {
+				return;
+			}
+
+			status.value = 'error';
+			error.value = error_ instanceof Error ? error_.message : String(error_);
+		}
+	};
+
+	const requestCrop = (crop: CropValue) => {
+		const current = result.value;
+		if (
+			!current
+			|| matteSchedulePending
+			|| mattePendingCount > 0
+			|| current.crop === crop
+		) {
+			return;
+		}
+
+		const isCurrent = cropProcessing.claim();
+		processor.invalidateCrop();
+		status.value = 'processing';
+		produceCrop(crop, isCurrent).catch((error_) => {
+			if (isCurrent()) {
+				status.value = 'error';
+				error.value = error_ instanceof Error ? error_.message : String(error_);
+			}
+		});
+	};
+
+	const produceMatte = async (request: MatteRequest, isCurrent: () => boolean) => {
+		try {
+			const matte = await processor.matte(
+				request.options,
+				options.crop,
+			);
 			if (!isCurrent()) {
 				return;
 			}
@@ -189,11 +273,15 @@ export const createMattingStore = ({
 			releaseResult();
 			result.value = {
 				url: io.createObjectURL(matte.image),
+				mattePreviewUrl: io.createObjectURL(matte.mattePreview),
 				width: matte.width,
 				height: matte.height,
+				crop: matte.crop,
+				cropMetadata: matte.cropMetadata,
 				background1: matte.background1,
 				background2: matte.background2,
 				backgroundDistance: matte.backgroundDistance,
+				cropClippingThreshold: matte.cropClippingThreshold,
 				size: matte.image.size,
 			};
 			status.value = 'idle';
@@ -208,13 +296,34 @@ export const createMattingStore = ({
 		}
 	};
 
-	const run = async () => {
-		const first = image1.value;
-		const second = image2.value;
+	const startCropPreview = (crop: CropValue) => {
+		cropPreviewValue.value = crop;
+		cropPreviewActive.value = true;
+	};
+
+	const updateCropPreview = (crop: CropValue) => {
+		cropPreviewValue.value = crop;
+		cropPreviewActive.value = true;
+	};
+
+	const endCropPreview = () => {
+		cropPreviewValue.value = options.crop;
+		cropPreviewActive.value = false;
+	};
+
+	const cancelCropPreview = () => {
+		cropPreviewValue.value = options.crop;
+		cropPreviewActive.value = false;
+	};
+
+	const run = async (request: MatteRequest) => {
+		matteSchedulePending = false;
+		const { first, second } = request;
 		error.value = null;
 
 		if (!first || !second) {
 			processing.invalidate();
+			cropProcessing.invalidate();
 			processor.invalidate();
 			releaseResult();
 			status.value = 'idle';
@@ -224,6 +333,7 @@ export const createMattingStore = ({
 		const mismatch = sizeMismatch(first, second);
 		if (mismatch) {
 			processing.invalidate();
+			cropProcessing.invalidate();
 			processor.invalidate();
 			releaseResult();
 			status.value = 'error';
@@ -233,29 +343,48 @@ export const createMattingStore = ({
 
 		const isCurrent = processing.claim();
 		status.value = 'processing';
+		mattePendingCount += 1;
 
-		// Yield a frame so the processing state paints before posting work to the worker.
-		await io.nextFrame();
-		if (isCurrent()) {
-			await produce(isCurrent);
+		try {
+			// Yield a frame so the processing state paints before posting work to the worker.
+			await io.nextFrame();
+			if (isCurrent()) {
+				await produceMatte(request, isCurrent);
+			}
+		} finally {
+			mattePendingCount -= 1;
+			if (isCurrent()) {
+				requestCrop(options.crop);
+			}
 		}
 	};
 
-	let debounce: ReturnType<typeof setTimeout> | undefined;
-	const schedule = () => {
+	const scheduleMatte = () => {
 		// Retire any in-flight run immediately so a slow encode can't land after
 		// the inputs changed; a fresh run is queued behind the debounce.
 		processing.invalidate();
+		cropProcessing.invalidate();
 		processor.invalidate();
+		cropPreviewActive.value = false;
+		matteSchedulePending = true;
 		clearTimeout(debounce);
-		debounce = setTimeout(run, debounceMs);
+		debounce = setTimeout(() => {
+			run(matteRequest.value).catch((error_) => {
+				status.value = 'error';
+				error.value = error_ instanceof Error ? error_.message : String(error_);
+			});
+		}, debounceMs);
 	};
 
-	// `flush: 'sync'` so an input or option change retires stale async work in
-	// the same tick it happens, not on the next render flush. `options` is a
-	// reactive object, so its watch is deep by default (covers nested colors).
-	watch([image1, image2], schedule, { flush: 'sync' });
-	watch(options, schedule, { flush: 'sync' });
+	// Watching the request makes each declared matte input invalidate all of its
+	// downstream output together. Vue batches same-tick changes before scheduling.
+	watch(matteRequest, scheduleMatte);
+	watch(() => options.crop, (crop) => {
+		if (!cropPreviewActive.value) {
+			cropPreviewValue.value = crop;
+		}
+		requestCrop(crop);
+	});
 
 	const setImage = async (slot: Slot, source: File | Promise<File>) => {
 		// Claim the slot synchronously, before any async work, so a slow source
@@ -263,7 +392,9 @@ export const createMattingStore = ({
 		// was still loading.
 		const isCurrent = decoding[slot].claim();
 		processing.invalidate();
+		cropProcessing.invalidate();
 		processor.invalidate();
+		cropPreviewActive.value = false;
 
 		let file: File;
 		let decoded: DecodedImage;
@@ -307,6 +438,8 @@ export const createMattingStore = ({
 
 	const clearImage = (slot: Slot) => {
 		decoding[slot].invalidate();
+		cropProcessing.invalidate();
+		processor.invalidateCrop();
 		processor.clearImage(slot);
 		const target = slot === 1 ? image1 : image2;
 		revokePreview(target.value);
@@ -314,11 +447,13 @@ export const createMattingStore = ({
 	};
 
 	const reset = () => {
+		cropPreviewActive.value = false;
 		Object.assign(options, createDefaultOptions());
 	};
 
 	onScopeDispose(() => {
 		processing.invalidate();
+		cropProcessing.invalidate();
 		processor.dispose();
 		decoding[1].invalidate();
 		decoding[2].invalidate();
@@ -333,14 +468,21 @@ export const createMattingStore = ({
 		image2,
 		options,
 		result,
+		cropPreviewValue,
+		cropPreviewActive,
 		status,
 		error,
 		showOutput,
 		detected1,
 		detected2,
+		cropClippingThreshold,
 		setImage,
 		clearImage,
 		reset,
+		startCropPreview,
+		updateCropPreview,
+		endCropPreview,
+		cancelCropPreview,
 	};
 };
 
