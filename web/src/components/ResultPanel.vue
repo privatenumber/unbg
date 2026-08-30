@@ -69,10 +69,14 @@ const previewStyle = computed(() => {
 				/>
 			</div>
 			<a
-				v-if="result && status === 'idle'"
-				:href="result.url"
-				:download="downloadName"
-				class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3.5 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
+				v-if="result"
+				:href="status === 'idle' ? result.url : undefined"
+				:download="status === 'idle' ? downloadName : undefined"
+				:aria-disabled="status !== 'idle'"
+				class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3.5 py-1.5 text-sm font-medium text-black transition-opacity"
+				:class="status === 'idle'
+					? 'hover:opacity-90'
+					: 'pointer-events-none opacity-40'"
 			>
 				<IconDownload class="size-4" />
 				Download
