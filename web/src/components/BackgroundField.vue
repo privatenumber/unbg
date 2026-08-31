@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Rgb } from '../lib/core.ts';
 import { hexToRgb, rgbToCss, rgbToHex } from '../lib/format.ts';
 
@@ -10,20 +10,35 @@ const props = defineProps<{
 
 const auto = defineModel<boolean>('auto', { required: true });
 const color = defineModel<Rgb>('color', { required: true });
+const draftColor = ref(color.value);
 
-const swatch = computed(() => (auto.value && props.detected ? props.detected : color.value));
+const swatch = computed(() => (auto.value && props.detected ? props.detected : draftColor.value));
 
 const hex = computed({
-	get: () => rgbToHex(color.value),
-	set: (value: string) => { color.value = hexToRgb(value); },
+	get: () => rgbToHex(draftColor.value),
+	set: (value: string) => { draftColor.value = hexToRgb(value); },
 });
 
-// Seed the manual color with the detected value when switching off auto.
-watch(auto, (isAuto) => {
-	if (!isAuto && props.detected) {
-		color.value = { ...props.detected };
-	}
+watch(color, (nextColor) => {
+	draftColor.value = nextColor;
 });
+
+const toggleAuto = () => {
+	if (auto.value) {
+		if (props.detected) {
+			draftColor.value = { ...props.detected };
+			color.value = draftColor.value;
+		}
+		auto.value = false;
+		return;
+	}
+
+	auto.value = true;
+};
+
+const commitColor = () => {
+	color.value = draftColor.value;
+};
 </script>
 
 <template>
@@ -37,7 +52,7 @@ watch(auto, (isAuto) => {
 				:class="auto
 					? 'bg-accent/15 text-accent'
 					: 'bg-surface text-zinc-500 hover:text-zinc-300'"
-				@click="auto = !auto"
+				@click="toggleAuto"
 			>
 				{{ auto ? 'Auto' : 'Manual' }}
 			</button>
@@ -58,6 +73,7 @@ watch(auto, (isAuto) => {
 					type="color"
 					class="absolute inset-0 size-full opacity-0"
 					title="Pick a color"
+					@change="commitColor"
 				>
 			</span>
 

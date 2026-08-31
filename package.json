@@ -46,7 +46,7 @@
 		"web:build": "pnpm --filter web build",
 		"web:dev": "pnpm --filter web dev",
 		"lint": "lintroll --cache --git --node",
-		"test": "node tests/index.ts",
+		"test": "node tests/index.ts && pnpm --filter web test",
 		"type-check": "tsc",
 		"prepack": "pnpm build && clean-pkg-json",
 		"prepare": "skills-npm"
