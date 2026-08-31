@@ -7,3 +7,10 @@
  * the path to the sibling source.
  */
 export * from '../../../src/core/index.ts';
+export {
+	cropImage, findCropBounds,
+} from '../../../src/core/crop-transparent.ts';
+export {
+	findContentBounds,
+	type ContentBounds,
+} from '../../../src/core/find-content-bounds.ts';
