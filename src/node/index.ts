@@ -1,5 +1,5 @@
 import {
-	cropTransparent, differenceMatting,
+	cropContent, cropTransparent, differenceMatting,
 	type Rgb, type DifferenceMattingOptions,
 } from '../core/index.ts';
 import { validateCropThreshold } from '../core/crop-transparent.ts';
@@ -10,8 +10,8 @@ export type UnbgResult = {
 
 	/**
 	 * PNG-encoded bytes of the extracted foreground.
-	 * Persist it however you like — `fs.writeFile(path, image)`, an HTTP
-	 * response body, an upload. The library does no file writing of its own.
+	 * Persist it however you like. Use `fs.writeFile(path, image)`, an HTTP
+	 * response body, or an upload. The library does no file writing of its own.
 	 */
 	image: Uint8Array;
 
@@ -28,13 +28,17 @@ export type UnbgResult = {
 	/** Euclidean distance between the two background colors (0-441.7). */
 	backgroundDistance: number;
 
+	/** First numeric crop threshold that excludes a nontransparent edge pixel. */
+	cropClippingThreshold: number | null;
+
 };
 
 export type UnbgOptions = DifferenceMattingOptions & {
 
 	/**
-	 * Trim transparent edges from the result. A number from 0 to 1 sets the
-	 * alpha threshold used only to calculate the crop bounds.
+	 * Trim transparent edges from the result. `true` uses automatic edge-density
+	 * trimming. A number from 0 to 1 sets the alpha threshold used only to
+	 * calculate the crop bounds.
 	 */
 	crop?: boolean | number;
 };
@@ -46,8 +50,9 @@ export type UnbgOptions = DifferenceMattingOptions & {
  *
  * The images must be opaque, pixel-aligned, and the same dimensions. The two
  * background colors should be as distinct as possible; pure black and white are ideal.
- * Set `crop` to trim transparent edges; a numeric value sets the alpha threshold
- * used only to calculate the crop bounds.
+ * Set `crop` to trim transparent edges. `true` uses automatic edge-density
+ * trimming; a numeric value sets the alpha threshold used only to calculate the
+ * crop bounds.
  *
  * @example
  * ```ts
@@ -77,10 +82,9 @@ export const unbg = async (
 	// so both the Node and browser entry points enforce the same contract.
 	const result = differenceMatting(first, second, options);
 	const crop = options?.crop;
-	const cropThreshold = typeof crop === 'number' ? crop : 0;
 	const image = crop === undefined || crop === false
 		? result
-		: cropTransparent(result, cropThreshold);
+		: (crop === true ? cropContent(result) : cropTransparent(result, crop));
 	const encoded = await encodeImage(image);
 
 	return {
@@ -90,5 +94,6 @@ export const unbg = async (
 		background1: result.background1,
 		background2: result.background2,
 		backgroundDistance: result.backgroundDistance,
+		cropClippingThreshold: result.cropClippingThreshold,
 	};
 };

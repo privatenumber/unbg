@@ -12,4 +12,4 @@ export type { Rgb, RgbaImage, DifferenceMattingOptions } from './types.ts';
 export type { DifferenceMattingResult } from './difference-matting.ts';
 export { differenceMatting } from './difference-matting.ts';
 export { detectBackground } from './detect-background.ts';
-export { cropTransparent } from './crop-transparent.ts';
+export { cropContent, cropTransparent } from './crop-transparent.ts';

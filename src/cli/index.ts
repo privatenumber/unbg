@@ -40,7 +40,7 @@ const argv = cli({
 		crop: {
 			type: parseCrop,
 			placeholder: '[0-1]',
-			description: 'Trim transparent edges; an optional alpha threshold only affects the crop bounds',
+			description: 'Trim transparent edges automatically. A value uses an alpha threshold when finding the bounds',
 		},
 		background1: {
 			type: parseColor,
@@ -62,13 +62,13 @@ const argv = cli({
 			type: Float,
 			default: 0,
 			placeholder: '<0-1>',
-			description: 'Snap alpha at or below this to fully transparent — suppresses background noise (default: off)',
+			description: 'Snap alpha at or below this to fully transparent. Suppresses background noise (default: off)',
 		},
 		ceiling: {
 			type: Float,
 			default: 1,
 			placeholder: '<0-1>',
-			description: 'Snap alpha at or above this to fully opaque — suppresses haze (default: off)',
+			description: 'Snap alpha at or above this to fully opaque. Suppresses haze (default: off)',
 		},
 	},
 
@@ -114,7 +114,19 @@ try {
 	console.error(`Background distance: ${result.backgroundDistance.toFixed(1)}`);
 
 	if (result.backgroundDistance < 50) {
-		console.error('Warning: backgrounds are very similar — extraction will be noisy. Use more distinct colors (black and white are ideal).');
+		console.error('Warning: backgrounds are very similar. Extraction will be noisy. Use more distinct colors (black and white are ideal).');
+	}
+
+	if (crop === true) {
+		console.error('Crop mode: automatic edge-density');
+	} else if (typeof crop === 'number') {
+		console.error(`Crop threshold: ${crop.toFixed(3)}`);
+		if (result.cropClippingThreshold !== null) {
+			console.error(`Starts clipping non-transparent pixels at: ${result.cropClippingThreshold.toFixed(3)}`);
+			if (crop >= result.cropClippingThreshold) {
+				console.error('Warning: crop threshold clips non-transparent edge pixels');
+			}
+		}
 	}
 
 	const outputPath = output ?? uniqueOutputPath(deriveOutputPath(image1, image2));

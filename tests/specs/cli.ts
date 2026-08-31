@@ -128,7 +128,59 @@ describe('cli', () => {
 		expect(failure?.stderr).toMatch('Invalid color');
 	});
 
-	test('crops with a boolean or numeric threshold', async () => {
+	test('crops automatically or with an explicit numeric threshold', async () => {
+		const width = 8;
+		const height = 8;
+		const scene = createScene(width, height, {
+			r: 30,
+			g: 144,
+			b: 255,
+		});
+		await using fixture = await createFixture({
+			'a.png': await toPng(composite(scene, white), width, height),
+			'b.png': await toPng(composite(scene, black), width, height),
+		});
+
+		const booleanRun = await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop',
+			'--output',
+			fixture.getPath('boolean.png'),
+		);
+		const thresholdRun = await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop',
+			'0.02',
+			'--output',
+			fixture.getPath('threshold.png'),
+		);
+		const clippingRun = await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop',
+			'0.6',
+			'--output',
+			fixture.getPath('clipping.png'),
+		);
+
+		expect(booleanRun.stderr).toMatch('Crop mode: automatic edge-density');
+		expect(thresholdRun.stderr).toMatch('Crop threshold: 0.020');
+		expect(clippingRun.stderr).toMatch('Warning: crop threshold clips non-transparent edge pixels');
+
+		const booleanResult = await decodeImage(await fixture.readFile('boolean.png'));
+		const thresholdResult = await decodeImage(await fixture.readFile('threshold.png'));
+		expect(booleanResult.width).toBe(6);
+		expect(booleanResult.height).toBe(6);
+		expect(thresholdResult.width).toBe(6);
+		expect(thresholdResult.height).toBe(6);
+		const clippingResult = await decodeImage(await fixture.readFile('clipping.png'));
+		expect(clippingResult.width).toBe(4);
+		expect(clippingResult.height).toBe(4);
+	});
+
+	test('accepts explicit crop disabling and numeric endpoints', async () => {
 		const width = 8;
 		const height = 8;
 		const scene = createScene(width, height, {
@@ -144,24 +196,50 @@ describe('cli', () => {
 		await run(
 			fixture.getPath('a.png'),
 			fixture.getPath('b.png'),
-			'--crop',
+			'--crop=false',
 			'--output',
-			fixture.getPath('boolean.png'),
+			fixture.getPath('disabled.png'),
 		);
 		await run(
 			fixture.getPath('a.png'),
 			fixture.getPath('b.png'),
-			'--crop',
-			'0.02',
+			'--crop=0',
 			'--output',
-			fixture.getPath('threshold.png'),
+			fixture.getPath('zero.png'),
+		);
+		await run(
+			fixture.getPath('a.png'),
+			fixture.getPath('b.png'),
+			'--crop=1',
+			'--output',
+			fixture.getPath('one.png'),
 		);
 
-		const booleanResult = await decodeImage(await fixture.readFile('boolean.png'));
-		const thresholdResult = await decodeImage(await fixture.readFile('threshold.png'));
-		expect(booleanResult.width).toBe(6);
-		expect(booleanResult.height).toBe(6);
-		expect(thresholdResult.width).toBe(6);
-		expect(thresholdResult.height).toBe(6);
+		const disabled = await decodeImage(await fixture.readFile('disabled.png'));
+		const zero = await decodeImage(await fixture.readFile('zero.png'));
+		const one = await decodeImage(await fixture.readFile('one.png'));
+		expect(disabled.width).toBe(8);
+		expect(zero.width).toBe(6);
+		expect(one.width).toBe(1);
+	});
+
+	test('rejects invalid crop values before reading images', async () => {
+		for (const value of ['-0.1', '1.1', 'abc']) {
+			let failure: {
+				code?: number;
+				stderr?: string;
+			} | undefined;
+			try {
+				await run('first.png', 'second.png', `--crop=${value}`);
+			} catch (error) {
+				failure = error as {
+					code?: number;
+					stderr?: string;
+				};
+			}
+
+			expect(failure?.code).toBe(1);
+			expect(failure?.stderr).toMatch('Crop threshold must be between 0 and 1');
+		}
 	});
 });

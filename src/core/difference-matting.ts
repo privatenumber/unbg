@@ -1,4 +1,5 @@
 import { detectBackground } from './detect-background.ts';
+import { findCropClippingThreshold } from './crop-transparent.ts';
 import { validateRgbaImage } from './validate.ts';
 import type { Rgb, RgbaImage, DifferenceMattingOptions } from './types.ts';
 
@@ -12,6 +13,9 @@ export type DifferenceMattingResult = RgbaImage & {
 
 	/** Euclidean distance between the two background colors (0-441.7). */
 	backgroundDistance: number;
+
+	/** First numeric crop threshold that excludes a nontransparent edge pixel. */
+	cropClippingThreshold: number | null;
 };
 
 const clamp = (
@@ -261,6 +265,11 @@ export const differenceMatting = (
 		ceiling,
 		blendedBackground,
 	});
+	const cropClippingThreshold = findCropClippingThreshold({
+		data,
+		width,
+		height,
+	});
 
 	return {
 		data,
@@ -269,5 +278,6 @@ export const differenceMatting = (
 		background1,
 		background2,
 		backgroundDistance: colorDistance(background1, background2),
+		cropClippingThreshold,
 	};
 };
