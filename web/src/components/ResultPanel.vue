@@ -68,7 +68,7 @@ const previewStyle = computed(() => {
 				/>
 			</div>
 			<a
-				v-if="result && status !== 'error'"
+				v-if="result && status === 'idle'"
 				:href="result.url"
 				:download="downloadName"
 				class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3.5 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-90"

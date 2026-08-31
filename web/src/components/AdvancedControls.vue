@@ -52,7 +52,7 @@ const {
 						v-model="options.crop"
 						type="checkbox"
 						role="switch"
-						:aria-checked="options.crop"
+						:aria-checked="Boolean(options.crop)"
 						class="peer sr-only"
 					>
 					<span
