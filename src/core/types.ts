@@ -6,7 +6,7 @@ export type Rgb = {
 
 /**
  * Raw, unpremultiplied 8-bit RGBA pixels: 4 bytes per pixel, row-major. This is
- * the unit of currency for the core — every function takes and returns one, so
+ * the unit of currency for the core. Every function takes and returns one, so
  * "valid pixel data" is enforced by the type and the shared validator rather
  * than re-derived from loose `data`/`width`/`height` arguments at each call.
  */

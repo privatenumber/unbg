@@ -1,4 +1,4 @@
-/** Parses a valueless crop flag or a normalized alpha threshold. */
+/** Parses automatic crop, explicit crop disabling, or a normalized alpha threshold. */
 export const parseCrop = (value: string): boolean | number => {
 	if (!value || value === 'true') {
 		return true;

@@ -26,6 +26,7 @@ describe('unbg', () => {
 	test('separates the Node and raw-pixel API surfaces', () => {
 		expect(Object.keys(nodeApi)).toStrictEqual(['unbg']);
 		expect(Object.keys(coreApi).sort()).toStrictEqual([
+			'cropContent',
 			'cropTransparent',
 			'detectBackground',
 			'differenceMatting',
@@ -52,6 +53,7 @@ describe('unbg', () => {
 		expect(result.background1).toEqual(white);
 		expect(result.background2).toEqual(black);
 		expect(result.backgroundDistance).toBeGreaterThan(440);
+		expect(result.cropClippingThreshold).toBeGreaterThan(0);
 
 		// The returned bytes are a real, writable PNG.
 		expect(result.image).toBeInstanceOf(Uint8Array);
