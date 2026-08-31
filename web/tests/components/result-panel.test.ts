@@ -1,5 +1,7 @@
 import { mount } from '@vue/test-utils';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import {
+	afterEach, describe, expect, test, vi,
+} from 'vitest';
 import ResultPanel from '../../src/components/ResultPanel.vue';
 
 const state = vi.hoisted(() => ({
@@ -21,8 +23,16 @@ const state = vi.hoisted(() => ({
 			},
 			manualBounds: new Int32Array(),
 		},
-		background1: { r: 255, g: 255, b: 255 },
-		background2: { r: 0, g: 0, b: 0 },
+		background1: {
+			r: 255,
+			g: 255,
+			b: 255,
+		},
+		background2: {
+			r: 0,
+			g: 0,
+			b: 0,
+		},
 		backgroundDistance: 100,
 		cropClippingThreshold: null,
 		size: 1,
