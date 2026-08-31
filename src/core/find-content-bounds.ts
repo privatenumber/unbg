@@ -43,43 +43,85 @@ const isSparse = (
 	edgeLength: number,
 ) => foregroundPixels === 0 || foregroundPixels / edgeLength < minimumForegroundDensity;
 
-const countForegroundPixels = (image: RgbaImage) => {
+const createEdgeCounts = (image: RgbaImage) => {
+	const rowCounts = new Uint32Array(image.height);
+	const columnCounts = new Uint32Array(image.width);
 	let foregroundPixels = 0;
-	for (let offset = 3; offset < image.data.length; offset += 4) {
-		if (image.data[offset] > 0) {
-			foregroundPixels += 1;
+	for (let y = 0; y < image.height; y += 1) {
+		for (let x = 0; x < image.width; x += 1) {
+			if (alphaAt(image.data, image.width, x, y) > 0) {
+				rowCounts[y] += 1;
+				columnCounts[x] += 1;
+				foregroundPixels += 1;
+			}
 		}
 	}
 
-	return foregroundPixels;
+	return {
+		rowCounts,
+		columnCounts,
+		foregroundPixels,
+	};
 };
 
-const countEdgeForeground = (
-	image: RgbaImage,
+const setEdgeCounts = (
 	bounds: EdgeBounds,
+	rowCounts: Uint32Array,
+	columnCounts: Uint32Array,
 	edgeCounts: EdgeCounts,
 ) => {
-	const { data, width } = image;
-	edgeCounts.top = 0;
-	edgeCounts.bottom = 0;
-	edgeCounts.left = 0;
-	edgeCounts.right = 0;
+	edgeCounts.top = rowCounts[bounds.top];
+	edgeCounts.bottom = rowCounts[bounds.bottom];
+	edgeCounts.left = columnCounts[bounds.left];
+	edgeCounts.right = columnCounts[bounds.right];
+};
 
+const decrementColumnCounts = (
+	image: RgbaImage,
+	bounds: EdgeBounds,
+	columnCounts: Uint32Array,
+	y: number,
+) => {
+	const { data, width } = image;
 	for (let x = bounds.left; x <= bounds.right; x += 1) {
-		if (alphaAt(data, width, x, bounds.top) > 0) {
-			edgeCounts.top += 1;
-		}
-		if (alphaAt(data, width, x, bounds.bottom) > 0) {
-			edgeCounts.bottom += 1;
+		if (alphaAt(data, width, x, y) > 0) {
+			columnCounts[x] -= 1;
 		}
 	}
+};
+
+const decrementRowCounts = (
+	image: RgbaImage,
+	bounds: EdgeBounds,
+	rowCounts: Uint32Array,
+	x: number,
+) => {
+	const { data, width } = image;
 	for (let y = bounds.top; y <= bounds.bottom; y += 1) {
-		if (alphaAt(data, width, bounds.left, y) > 0) {
-			edgeCounts.left += 1;
+		if (alphaAt(data, width, x, y) > 0) {
+			rowCounts[y] -= 1;
 		}
-		if (alphaAt(data, width, bounds.right, y) > 0) {
-			edgeCounts.right += 1;
-		}
+	}
+};
+
+const updateEdgeCounts = (
+	image: RgbaImage,
+	bounds: EdgeBounds,
+	trimEdges: TrimEdges,
+	rowCounts: Uint32Array,
+	columnCounts: Uint32Array,
+) => {
+	if (trimEdges.top) {
+		decrementColumnCounts(image, bounds, columnCounts, bounds.top);
+	}
+	if (trimEdges.bottom) {
+		decrementColumnCounts(image, bounds, columnCounts, bounds.bottom);
+	}
+	if (trimEdges.left) {
+		decrementRowCounts(image, bounds, rowCounts, bounds.left);
+	}
+	if (trimEdges.right) {
+		decrementRowCounts(image, bounds, rowCounts, bounds.right);
 	}
 };
 
@@ -127,6 +169,10 @@ const normalizeTrimEdges = (
 	normalizeHorizontalTrimEdges(trimEdges, edgeCounts, currentWidth);
 };
 
+const countCornerOverlap = (firstEdge: boolean, secondEdge: boolean, alpha: number) => (
+	Number(firstEdge) * Number(secondEdge) * Number(alpha > 0)
+);
+
 const countRemovedForeground = (
 	image: RgbaImage,
 	bounds: EdgeBounds,
@@ -135,30 +181,38 @@ const countRemovedForeground = (
 ) => {
 	const { data, width } = image;
 	let removedForeground = 0;
-	let firstRow = bounds.top;
-	let lastRow = bounds.bottom;
 	if (trimEdges.top) {
 		removedForeground += edgeCounts.top;
-		firstRow += 1;
 	}
 	if (trimEdges.bottom) {
 		removedForeground += edgeCounts.bottom;
-		lastRow -= 1;
 	}
 	if (trimEdges.left) {
-		for (let y = firstRow; y <= lastRow; y += 1) {
-			if (alphaAt(data, width, bounds.left, y) > 0) {
-				removedForeground += 1;
-			}
-		}
+		removedForeground += edgeCounts.left;
 	}
 	if (trimEdges.right) {
-		for (let y = firstRow; y <= lastRow; y += 1) {
-			if (alphaAt(data, width, bounds.right, y) > 0) {
-				removedForeground += 1;
-			}
-		}
+		removedForeground += edgeCounts.right;
 	}
+	removedForeground -= countCornerOverlap(
+		trimEdges.top,
+		trimEdges.left,
+		alphaAt(data, width, bounds.left, bounds.top),
+	);
+	removedForeground -= countCornerOverlap(
+		trimEdges.top,
+		trimEdges.right,
+		alphaAt(data, width, bounds.right, bounds.top),
+	);
+	removedForeground -= countCornerOverlap(
+		trimEdges.bottom,
+		trimEdges.left,
+		alphaAt(data, width, bounds.left, bounds.bottom),
+	);
+	removedForeground -= countCornerOverlap(
+		trimEdges.bottom,
+		trimEdges.right,
+		alphaAt(data, width, bounds.right, bounds.bottom),
+	);
 	return removedForeground;
 };
 
@@ -219,7 +273,10 @@ export const findContentBounds = (image: RgbaImage): ContentBounds | null => {
 	validateRgbaImage(image, 'image');
 
 	const { width, height } = image;
-	let foregroundPixels = countForegroundPixels(image);
+	const {
+		rowCounts, columnCounts, foregroundPixels: initialForegroundPixels,
+	} = createEdgeCounts(image);
+	let foregroundPixels = initialForegroundPixels;
 
 	if (foregroundPixels === 0) {
 		return null;
@@ -247,7 +304,7 @@ export const findContentBounds = (image: RgbaImage): ContentBounds | null => {
 	while (bounds.left <= bounds.right && bounds.top <= bounds.bottom) {
 		const currentWidth = bounds.right - bounds.left + 1;
 		const currentHeight = bounds.bottom - bounds.top + 1;
-		countEdgeForeground(image, bounds, edgeCounts);
+		setEdgeCounts(bounds, rowCounts, columnCounts, edgeCounts);
 		trimEdges.top = isSparse(edgeCounts.top, currentWidth);
 		trimEdges.bottom = isSparse(edgeCounts.bottom, currentWidth);
 		trimEdges.left = isSparse(edgeCounts.left, currentHeight);
@@ -277,6 +334,7 @@ export const findContentBounds = (image: RgbaImage): ContentBounds | null => {
 			break;
 		}
 
+		updateEdgeCounts(image, bounds, trimEdges, rowCounts, columnCounts);
 		if (!advanceBounds(bounds, trimEdges)) {
 			break;
 		}

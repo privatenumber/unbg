@@ -197,4 +197,21 @@ describe('cropContent', () => {
 			height: 1,
 		});
 	});
+
+	test('trims an elongated image without rescanning each edge', () => {
+		const height = 10_000;
+		const data = new Uint8Array(height * 4);
+		data[((height / 2) * 4) + 3] = 255;
+
+		expect(findContentBounds({
+			data,
+			width: 1,
+			height,
+		})).toStrictEqual({
+			x: 0,
+			y: height / 2,
+			width: 1,
+			height: 1,
+		});
+	});
 });
