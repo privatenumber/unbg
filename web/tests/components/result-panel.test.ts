@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
 	status: 'idle' as 'idle' | 'processing',
 	result: {
 		url: 'blob:result',
-		mattePreviewUrl: 'blob:matte',
+		mattePreviewUrl: '',
 		width: 100,
 		height: 100,
 		crop: true,
