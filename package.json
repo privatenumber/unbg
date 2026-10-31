@@ -39,7 +39,7 @@
 			"default": "./dist/core/index.mjs"
 		}
 	},
-	"packageManager": "pnpm@10.20.0",
+	"packageManager": "pnpm@12.15.0",
 	"scripts": {
 		"build": "pkgroll",
 		"cli": "node src/cli/index.ts",
@@ -48,8 +48,7 @@
 		"lint": "lintroll --cache --git --node",
 		"test": "node tests/index.ts && pnpm --filter web test",
 		"type-check": "tsc",
-		"prepack": "pnpm build && clean-pkg-json",
-		"prepare": "skills-npm"
+		"prepack": "pnpm build && clean-pkg-json"
 	},
 	"engines": {
 		"node": ">=22.22.2"
@@ -67,7 +66,6 @@
 		"lintroll": "^1.31.1",
 		"manten": "^2.0.2",
 		"pkgroll": "^2.27.1",
-		"skills-npm": "^1.2.0",
 		"typescript": "^6.0.2"
 	}
 }

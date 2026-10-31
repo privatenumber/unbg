@@ -152,7 +152,7 @@ Only `unbg()` and the CLI are Node-only: `unbg()` loads image codecs and the CLI
 
 ## Agent skills
 
-unbg ships an [agent skill](https://agentskills.io) that [`skills-npm`](https://github.com/antfu/skills-npm) discovers automatically, so coding agents like **Claude Code** and **Codex** know when and how to reach for it.
+unbg ships an [agent skill](https://agentskills.io) that pnpm links into `.agents/skills` in your project once you approve it with `pnpm approve`, so coding agents know when and how to reach for it.
 
 ## How it works
 
